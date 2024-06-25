@@ -71,6 +71,7 @@ dependencies {
     implementation(libs.androidx.navigation.fragment.ktx)
     implementation(libs.androidx.navigation.ui.ktx)
     implementation(libs.firebase.storage.ktx)
+    implementation(libs.firebase.database.ktx)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -80,4 +81,5 @@ dependencies {
     debugImplementation(libs.androidx.ui.test.manifest)
     implementation (libs.androidx.appcompat.v141)
     implementation (libs.material.v150)
+    implementation (libs.glide)
 }

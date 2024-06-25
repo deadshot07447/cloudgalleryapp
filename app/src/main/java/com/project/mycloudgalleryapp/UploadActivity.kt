@@ -6,55 +6,85 @@ import android.net.Uri
 import android.os.Bundle
 import android.widget.Button
 import android.widget.ImageView
-import android.widget.Toast
+import android.widget.ProgressBar
 import androidx.appcompat.app.AppCompatActivity
-import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.DatabaseReference
+import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.storage.FirebaseStorage
+import com.google.firebase.storage.StorageReference
 
 class UploadActivity : AppCompatActivity() {
 
-    private lateinit var auth: FirebaseAuth
-    private lateinit var storage: FirebaseStorage
-    private lateinit var selectImageButton: Button
-    private lateinit var uploadButton: Button
     private lateinit var imageView: ImageView
+    private lateinit var buttonChooseImage: Button
+    private lateinit var buttonUpload: Button
+    private lateinit var progressBar: ProgressBar
+
+    private lateinit var storageReference: StorageReference
+    private lateinit var databaseReference: DatabaseReference
+
     private var imageUri: Uri? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_upload)
 
-        auth = FirebaseAuth.getInstance()
-        storage = FirebaseStorage.getInstance()
-
-        selectImageButton = findViewById(R.id.selectImageButton)
-        uploadButton = findViewById(R.id.uploadButton)
         imageView = findViewById(R.id.imageView)
+        buttonChooseImage = findViewById(R.id.button_choose_image)
+        buttonUpload = findViewById(R.id.button_upload)
+        progressBar = findViewById(R.id.progress_bar)
 
-        selectImageButton.setOnClickListener {
-            val intent = Intent(Intent.ACTION_PICK)
-            intent.type = "image/*"
-            startActivityForResult(intent, 1)
+        storageReference = FirebaseStorage.getInstance().reference
+        databaseReference = FirebaseDatabase.getInstance().getReference("uploads")
+
+        buttonChooseImage.setOnClickListener {
+            openFileChooser()
         }
 
-        uploadButton.setOnClickListener {
-            imageUri?.let {
-                val ref = storage.reference.child("images/${auth.currentUser?.uid}/${it.lastPathSegment}")
-                ref.putFile(it).addOnSuccessListener {
-                    Toast.makeText(this, "Image uploaded successfully", Toast.LENGTH_SHORT).show()
-                    finish()
-                }.addOnFailureListener {
-                    Toast.makeText(this, "Failed to upload image", Toast.LENGTH_SHORT).show()
-                }
-            }
+        buttonUpload.setOnClickListener {
+            uploadImage()
         }
+    }
+
+    private fun openFileChooser() {
+        val intent = Intent()
+        intent.type = "image/*"
+        intent.action = Intent.ACTION_GET_CONTENT
+        startActivityForResult(intent, PICK_IMAGE_REQUEST)
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == 1 && resultCode == Activity.RESULT_OK && data != null) {
+        if (requestCode == PICK_IMAGE_REQUEST && resultCode == Activity.RESULT_OK && data != null && data.data != null) {
             imageUri = data.data
             imageView.setImageURI(imageUri)
+            buttonUpload.visibility = android.view.View.VISIBLE
         }
+    }
+
+    private fun uploadImage() {
+        if (imageUri != null) {
+            progressBar.visibility = android.view.View.VISIBLE
+            val fileReference = storageReference.child("uploads/" + System.currentTimeMillis() + ".jpg")
+            fileReference.putFile(imageUri!!)
+                .addOnSuccessListener {
+                    fileReference.downloadUrl.addOnSuccessListener { uri ->
+                        val upload = ImageData(uri.toString())
+                        val uploadId = databaseReference.push().key
+                        if (uploadId != null) {
+                            databaseReference.child(uploadId).setValue(upload)
+                        }
+                        progressBar.visibility = android.view.View.GONE
+                        buttonUpload.visibility = android.view.View.GONE
+                    }
+                }
+                .addOnFailureListener {
+                    progressBar.visibility = android.view.View.GONE
+                }
+        }
+    }
+
+    companion object {
+        private const val PICK_IMAGE_REQUEST = 1
     }
 }
